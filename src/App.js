@@ -1,6 +1,6 @@
-import { ethers } from 'ethers';
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, TrendingUp, RefreshCw, Clock, Zap, Play, Pause, Activity, ExternalLink } from 'lucide-react';
+import { ethers } from 'ethers';
 
 const LIVE_ArbitrageBot = () => {
   const [opportunities, setOpportunities] = useState([]);
@@ -412,30 +412,9 @@ const LIVE_ArbitrageBot = () => {
       }
 
       // Create contract instance
-      if (typeof window.ethers === 'undefined') {
-        // Fallback for basic contract interaction
-        const contractInstance = {
-          address: contractAddress,
-          executeFlashLoanArbitrage: async (...args) => {
-            const data = `0x...`; // Would need to encode manually
-            return await window.ethereum.request({
-              method: 'eth_sendTransaction',
-              params: [{
-                to: contractAddress,
-                data: data
-              }]
-            });
-          }
-        };
-        setContract(contractInstance);
-      } else {
-        // Full ethers.js integration
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        const signer = provider.getSigner();
-        const contractInstance = new ethers.Contract(contractAddress, CONTRACT_ABI, signer);
-        setContract(contractInstance);
-      }
-      
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const contractInstance = new ethers.Contract(contractAddress, CONTRACT_ABI, signer);
       // Test contract connection by calling getInfo
       try {
         const info = await contractInstance.getInfo();
@@ -520,7 +499,7 @@ const LIVE_ArbitrageBot = () => {
 
       // Calculate amount in wei
       const tokenDecimals = tokens[opportunity.tokenA].decimals;
-      const amountWei = (opportunity.tradeAmount * (10 ** tokenDecimals)).toString();
+      const amountWei = ethers.utils.parseUnits(opportunity.tradeAmount.toString(), tokenDecimals);
 
       console.log('📤 Sending transaction to contract...');
       console.log('Trade details:', {
@@ -570,7 +549,7 @@ const LIVE_ArbitrageBot = () => {
             const parsed = contract.interface.parseLog(log);
             if (parsed.name === 'ArbitrageExecuted') {
               const profitWei = parsed.args.profit;
-              actualProfit = parseFloat(profitWei.toString()) / (10 ** tokenDecimals);
+              actualProfit = parseFloat(ethers.utils.formatUnits(profitWei, tokenDecimals));
               console.log(`📊 Actual profit from event: ${actualProfit} tokens`);
             }
           } catch (e) {
