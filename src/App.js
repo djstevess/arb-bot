@@ -1,3 +1,4 @@
+import { ethers } from 'ethers';
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, TrendingUp, RefreshCw, Clock, Zap, Play, Pause, Activity, ExternalLink } from 'lucide-react';
 
