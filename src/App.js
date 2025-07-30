@@ -63,6 +63,12 @@ const LIVE_ArbitrageBot = () => {
       routerAddress: '0x6BDED42c6DA8FBf0d2bA55B2fa120C5e0c8D7891',
       color: 'bg-blue-500'
     },
+    aerodrome: {
+      name: 'Aerodrome',
+      chain: 'base',
+      routerAddress: '0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43',
+      color: 'bg-green-500'
+    },
     pancakeswap: {
       name: 'PancakeSwap',
       chain: 'base',
