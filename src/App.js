@@ -410,13 +410,30 @@ const LIVE_ArbitrageBot = () => {
         return;
       }
 
-      // Create contract instance using ethers.js pattern
-      const provider = new window.ethereum.constructor.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-      
-      // Create contract interface
-      const contractInterface = new window.ethereum.constructor.utils.Interface(CONTRACT_ABI);
-      const contractInstance = new window.ethereum.constructor.Contract(contractAddress, contractInterface, signer);
+      // Create contract instance
+      if (typeof window.ethers === 'undefined') {
+        // Fallback for basic contract interaction
+        const contractInstance = {
+          address: contractAddress,
+          executeFlashLoanArbitrage: async (...args) => {
+            const data = `0x...`; // Would need to encode manually
+            return await window.ethereum.request({
+              method: 'eth_sendTransaction',
+              params: [{
+                to: contractAddress,
+                data: data
+              }]
+            });
+          }
+        };
+        setContract(contractInstance);
+      } else {
+        // Full ethers.js integration
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        const contractInstance = new ethers.Contract(contractAddress, CONTRACT_ABI, signer);
+        setContract(contractInstance);
+      }
       
       // Test contract connection by calling getInfo
       try {
@@ -460,44 +477,45 @@ const LIVE_ArbitrageBot = () => {
       return;
     }
 
-    try {
-      // Enhanced confirmation
-      const confirmed = window.confirm(
-        `🚨 EXECUTE REAL ARBITRAGE TRADE 🚨\n\n` +
-        `Pair: ${opportunity.tokenA}/${opportunity.tokenB}\n` +
-        `Buy: ${dexConfigs[opportunity.buyDex].name} @ $${opportunity.buyPrice.toFixed(6)}\n` +
-        `Sell: ${dexConfigs[opportunity.sellDex].name} @ $${opportunity.sellPrice.toFixed(6)}\n` +
-        `Amount: $${opportunity.tradeAmount}\n` +
-        `Expected Profit: $${opportunity.netProfitUSD.toFixed(2)} (${opportunity.netProfitPercent.toFixed(3)}%)\n` +
-        `Gas Cost: $${opportunity.gasCostUSD.toFixed(2)}\n` +
-        `Confidence: ${opportunity.confidence.toFixed(0)}%\n\n` +
-        `⚠️ THIS USES REAL MONEY ON BASE MAINNET!\n\n` +
-        `Execute trade?`
-      );
-      
-      if (!confirmed) {
-        console.log("❌ Trade cancelled by user");
-        return;
-      }
+    // Enhanced confirmation
+    const confirmed = window.confirm(
+      `🚨 EXECUTE REAL ARBITRAGE TRADE 🚨\n\n` +
+      `Pair: ${opportunity.tokenA}/${opportunity.tokenB}\n` +
+      `Buy: ${dexConfigs[opportunity.buyDex].name} @ ${opportunity.buyPrice.toFixed(6)}\n` +
+      `Sell: ${dexConfigs[opportunity.sellDex].name} @ ${opportunity.sellPrice.toFixed(6)}\n` +
+      `Amount: ${opportunity.tradeAmount}\n` +
+      `Expected Profit: ${opportunity.netProfitUSD.toFixed(2)} (${opportunity.netProfitPercent.toFixed(3)}%)\n` +
+      `Gas Cost: ${opportunity.gasCostUSD.toFixed(2)}\n` +
+      `Confidence: ${opportunity.confidence.toFixed(0)}%\n\n` +
+      `⚠️ THIS USES REAL MONEY ON BASE MAINNET!\n\n` +
+      `Execute trade?`
+    );
+    
+    if (!confirmed) {
+      console.log("❌ Trade cancelled by user");
+      return;
+    }
 
-      console.log(`🚀 EXECUTING REAL ARBITRAGE TRADE...`);
-      addSuccess(`Executing arbitrage: ${opportunity.tokenA}/${opportunity.tokenB}`);
-      
-      // Add pending trade
-      const pendingTrade = {
-        id: Date.now(),
-        hash: null,
-        timestamp: new Date(),
-        tokenA: opportunity.tokenA,
-        tokenB: opportunity.tokenB,
-        amount: opportunity.tradeAmount,
-        expectedProfit: opportunity.netProfitUSD,
-        status: 'executing',
-        buyDex: opportunity.buyDex,
-        sellDex: opportunity.sellDex
-      };
-      
-      setExecutedTrades(prev => [pendingTrade, ...prev.slice(0, 9)]);
+    console.log(`🚀 EXECUTING REAL ARBITRAGE TRADE...`);
+    addSuccess(`Executing arbitrage: ${opportunity.tokenA}/${opportunity.tokenB}`);
+    
+    // Add pending trade
+    const pendingTrade = {
+      id: Date.now(),
+      hash: null,
+      timestamp: new Date(),
+      tokenA: opportunity.tokenA,
+      tokenB: opportunity.tokenB,
+      amount: opportunity.tradeAmount,
+      expectedProfit: opportunity.netProfitUSD,
+      status: 'executing',
+      buyDex: opportunity.buyDex,
+      sellDex: opportunity.sellDex
+    };
+    
+    setExecutedTrades(prev => [pendingTrade, ...prev.slice(0, 9)]);
+
+    try {
 
       // Calculate amount in wei
       const tokenDecimals = tokens[opportunity.tokenA].decimals;
@@ -595,12 +613,11 @@ const LIVE_ArbitrageBot = () => {
         `Gas Used: ${receipt.gasUsed.toString()}\n\n` +
         `View on BaseScan:\nhttps://basescan.org/tx/${receipt.transactionHash}`
       );
-        
     } catch (contractError) {
       console.error("❌ Contract execution failed:", contractError);
       addError(`Execution failed: ${contractError.message}`);
       
-      // Update failed trade
+      // Update failed trade if pendingTrade was created
       setExecutedTrades(prev => prev.map(trade => 
         trade.id === pendingTrade.id 
           ? { ...trade, status: 'failed', error: contractError.message }
